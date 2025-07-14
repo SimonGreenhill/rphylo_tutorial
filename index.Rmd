@@ -1,5 +1,5 @@
 ---
-title: "index"
+title: "Basic Language Phylogenies Analysis in R"
 author: "Simon J. Greenhill"
 date: "2025-07-14"
 output: html_document
@@ -7,24 +7,463 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+ggplot2::theme_set(theme_bw(base_size=18))
 ```
 
-## R Markdown
+# Introduction
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+This tutorial introduces basic phylogenetic analyses in R using
+linguistic data. We will learn how to:
+  
+- Read phylogenetic trees and data
+- Visualise and manipulate trees
+- Construct trees using NJ, Parsimony, and Maximum Likelihood
+- Perform basic comparative analyses
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
-```{r cars}
-summary(cars)
+## Load Packages
+
+We need to make sure we have some critical packages installed: 
+
+- [APE (Analysis of Phylogenetics and Evolution)](https://emmanuelparadis.github.io/) - the base package for most phylogenetic stuff in R.
+- [Phytools](https://blog.phytools.org/) - lots of useful phylogenetic functions from Liam Revell.
+- [Phangorn](https://github.com/KlausVigo/phangorn) - handles distance, maximum parsimony, and maximum likelihood analyses
+
+```{r}
+# install them if needed:
+# install.packages(c("ape", "phytools", "phangorn", "ggplot2"))
+library(ape)
+library(phangorn)
+library(phytools)
+library(ggplot2)   # for plotting
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+# Understanding Phylogenetic Formats:
+
+## What is a Nexus File?
+
+The most common file format you'll encounter in phylogenetics is a _nexus_ file. The filename will usually end in .nex or .trees. Nexus is a very simple text format, that starts with "#NEXUS", and then contains a series of one or more 'blocks'. The blocks start with "BEGIN" ... and terminate
+with "END":
+
+```
+#NEXUS
+
+BEGIN DATA;
+
+DIMENSIONS NTAX=3 NCHAR=5;
+FORMAT MISSING=? GAP=- DATATYPE=BINARY;
+
+[my dataset]
+
+MATRIX 
+Tzeltal                  10100
+Chontal                  11110
+Akateco                  100?1
+END;
+
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+The above excerpt shows a small nexus data block. This tells us that in this datafile we have:
+
+* 3 taxa -- here languages (NTAX=3).
+* 5 characters (NCHAR=5).
+* A definition of the DATATYPE. Here we have binary data, other values here include "DNA", "nucleotide", "standard", "morph"(ological), etc. The correct value to use here will be determined by the program you want to use. For linguistic data we usually need "binary" or BEAST wants 'binary' or "standard" for linguistic data.
+* The character "?" is a missing value (i.e. data we don't have)
+* The names of the taxa are Tzeltal, Chontal, Akateco. 
+* The data for these languages e.g. Tzeltal = 10100
+* Comments are included [within square brackets]. 
+
+Uppercase or lowercase does not matter.
+
+## Tree blocks:
+
+Another block you will come across are tree blocks. This one contains one tree, called "mytree" for three languages:
+
+```
+BEGIN trees;
+    tree mytree = (Akateco:2,(Chontal:1,Tzeltal:1):1);
+END;
+```
+
+The format of this tree is Newick (<https://en.wikipedia.org/wiki/Newick_format>), which has a nested structure of parentheses. This one tells us that Chontal and Tzeltal are more closely linked to each other then Akateco (i.e. they are nested within an extra set of ()'s). The numbers `:1` etc tell us the branch lengths (here Akateco has a length of 2, while all other branches have 1).
+
+Open the nexus file `./data/cpacific.nex` in a text editor and have a look.
+
+- [ ] Can you see how many taxa/languages there are in this file? 
+
+- [ ] How many characters?
+
+
+## Visualising Trees
+
+We can easily plot trees from a newick string: 
+
+```{r}
+tree_text <- "(Akateco:2,(Chontal:1,Tzeltal:1):1);"
+ling_tree <- read.tree(text = tree_text)
+plot(ling_tree, main = "Example Language Phylogeny")
+axisPhylo()  # gives us a branch length scale
+```
+The axis on the bottom tells us how long each branch is, for example the length
+of the Akateco branch is 2.
+
+- [ ] What is the distance between Tzeltal and Chontal? (hint sum the branches)
+
+
+# Playing with real data:
+
+We can also load trees and data from a file. In the ./data/ directory I've put a nexus file of linguistic data from some Central Pacific languages (data/cpacific.nex) and a `maximum clade credibility tree` from a Bayesian phylogenetic analysis:
+
+Load the tree and plot it:
+
+```{r}
+tree.mcct <- read.nexus("data/cpacific.mcct.trees")
+plot(tree.mcct, main = "Central Pacific")
+```
+
+- [ ] Which language is most closely related to Kapingamarangi?
+
+The biggest subfamily of languages in our data is East Polynesian. It includes Maori, Rapanui (Easter Island) and all the other languages in that group.
+
+- [ ]  What are the other East Polynesian languages?
+
+
+There are plenty of ways to format these trees to make them look prettier, run `?plot.phylo` to see the help:
+
+```{r}
+?plot.phylo
+```
+
+```{r}
+plot(tree.mcct, type="cladogram", font=1, lwd=2, edge.color='steelblue')
+```
+
+```{r}
+plot(tree.mcct, type="fan", font=1, lwd=2, edge.color='tomato')
+```
+
+```{r}
+plot(tree.mcct, type="unrooted", font=1, lwd=2, edge.color='forestgreen')
+```
+
+```{r}
+plot(tree.mcct, type="cladogram", font=1, lwd=2, edge.color='darkorange', direction="up")
+```
+
+- [ ] Play around with this and make a prettier tree than I have.
+
+## Exploring the Tree
+ 
+We can get information about the tree:
+
+```{r}
+summary(tree.mcct)
+```
+
+```{r}
+Ntip(tree.mcct)  # how many taxa? 
+Nnode(tree.mcct)  # how many nodes?
+```
+- [ ] How many tips are there in this tree?
+
+- [ ] How many nodes are there in this tree?
+
+- [ ] What is the average branch length?
+
+
+We can see what taxa are on this tree:
+
+```{r}
+tree.mcct$tip.label
+```
+
+- [ ] How many trees are there for this many taxa?
+
+```{r}
+howmanytrees(Ntip(tree.mcct))
+```
+
+- [ ] How long are the branches on average (this tree has branches in terms of years):
+
+```{r}
+tree.mcct$edge.length
+summary(tree.mcct$edge.length)
+hist(tree.mcct$edge.length, breaks=100)
+```
+
+## Rooting and Manipulating Trees
+
+We can easily change the root of the tree and delete branches: 
+
+```{r}
+tree2 <- root(tree.mcct, outgroup = "EastFutuna", resolve.root = TRUE)
+plot(tree2)
+```
+
+The pseudoscientist [Thor Heyerdahl](https://en.wikipedia.org/wiki/Thor_Heyerdahl)  -- wrongly -- claimed that people spread through the Pacific from Rapanui (Easter Island).
+
+- [ ] Can you reroot the tree to find the tree that Thor would have liked?
+
+Perhaps I only want to focus on a small set of languages, I can remove the others:
+
+```{r}
+tree2 <- keep.tip(tree.mcct, c("Maori", "Hawaiian", "Marquesan", "Tahitian", "FijianBau"))
+# the inverse of this is `drop.tip` which *removes* the named tips
+plot(tree2)
+```
+
+- [ ] Can you extract a tree of all the Eastern Polynesian languages?
+
+# Constructing Trees from Data
+  
+## Load Linguistic Data from Nexus File
+
+We're going to use R to make some trees now. Load the data:
+
+```{r}
+cpacific <- read.nexus.data("data/cpacific.nex")
+```
+
+## Checking the data
+
+We want to make sure that the languages we're analysing have a good amount of data. Missing data is not necessarily a problem for phylogenetic analysis, it depends on *what's* missing more than *how much* (Wiens '06). However, it's good to take a look and see where problems might be.
+
+Run this:
+
+```{r}
+#' Taking a nexus file from _APE_'s read.nexus.data
+#' function, calculates how many states of the given
+#' value are present for each Taxon.
+#' 
+#' Returns a data frame.
+#'
+#' @param nexus a nexus.data object from read.nexus.data.
+#' @return A dataframe of \code{Taxon}, \code{State}, and \code{Count}.
+#' @examples
+#' nex <- read.nexus.data('filename.nex')
+#' statecounts(nex)
+statecounts <- function(nexus) {
+    # homework problem - figure out a more elegant way to do this.
+    out <- data.frame(Taxon=c(), State=c(), Count=c())
+    for (taxon in names(nexus)) {
+        f = as.data.frame(table(nexus[[taxon]]))
+        out <- rbind(out, 
+            data.frame(Taxon=taxon, State=f$Var1, Count=f$Freq)
+        )
+    }
+    out
+}
+
+sc <- statecounts(cpacific)
+ggplot(sc, aes(x=Taxon, y=Count, fill=State)) + 
+  geom_bar(stat="identity") +
+  coord_flip() +
+  xlab(NULL) +
+  scale_fill_manual(values=list("?"="tomato", "0"="lightgray", "1"="steelblue"))
+```
+
+
+You will probably see that there are many more 0's than 1's: there are more ways for a given site to *not* have the same value than for it to share the same value. 
+
+The state values should be reasonably banded (i.e. in this example, most of the languages have around 250 ones (in blue), ~2000 zeros (in gray). The missing data state is "?" in red. 
+
+Look at the number of '1's and '0's -- i.e. the amount of cognates in each language. 
+
+- [ ] Are there any taxa have a lot more cognates than anything else? 
+
+Most languages should have a similar amount of cognates and non-cognates. If not, then we need to worry about unequal sampling or 'butterfly collecting' in that language (e.g. collection of a wordlist with many synonyms, better data for that one taxon, etc). 
+
+If a taxa has a lot more 0's than the others, then it's deeply unrelated  to the rest, or we have poor data. Finally, look at the missing data. I think there's a couple of languages I'd worry about here -- the ones that have a lot of missing data *and* few cognates.
+
+
+- [ ] Which languages have the most cognates? 
+- [ ] Which languages have the most missing data?
+
+Should you remove languages with low data? if you remove them then you lose any information they provide and they may be interesting cases or vital for calibrations etc. If you don't remove them, they may 'float' around the tree and break up other groups. 
+
+The solution is to keep an eye on them and see what they do. Often if the languages are poorly attested because it's a bad wordlist or salvage data then you will probably have many of the deep cognates but fewer of the shallow cognate sets, so you will see them drag down to the base of the tree. Or if they've been poorly studied, then the sound changes might be badly understood, so they may have only shallow cognates and will glue onto whichever taxon happens to have the most similarities (hopefully a sister language, if you're lucky). 
+
+If these low data taxa don't behave, then delete them, unless you *need* them. If you need them, then consider adding a monophyly constraint to enforce their position in the tree.
+
+Let's leave them in for now, because a bit of risk makes life more fun.
+
+## Plot the distribution of cognate sizes
+
+How big are our cognate sets? If they're all really small, then we won't have any deep signal (i.e. we've only got the rapidly changing features). If they're all big, then we won't have any signal for sub-grouping the tips correctly (i.e. we've only got the highly stable features). 
+
+```{r}
+cognatesizes <- function(nex) {
+    df <- as.data.frame(nex)
+    
+    count <- function(arow) {
+        length(arow[arow == '1'])
+    }
+    out <- data.frame(
+        Site=row.names(df), Size=apply(df, 1, count)
+    )
+    out
+}
+
+sizes <- cognatesizes(cpacific)
+ggplot(sizes, aes(Size)) + geom_histogram()
+```
+
+
+What type of distribution would we expect to see? I think it should look a bit like the one above, where there are lots of cognates which are shared by one or two sister languages, and fewer cognates that stretch across many languages. 
+
+You may see other patterns. If you see very few cognates up the right side of the graph, then you have few cognates that are shared across most/all languages. That is, you have little deep signal and you will find it hard to resolve the deepest groupings in the phylogeny. This will happen if you've got lots of weakly related languages.
+
+If you see very few cognates on the left side of the distribution, then you've got few cognates between sister languages and small groups. This will be a much bigger problem -- you may be able to recover the deeper groupings but younger relationships will be flakey.
+
+
+# Building Trees:
+
+## Distance Trees:
+
+Let's start with building a Neighbour-joining tree. First, convert the data to the format phangorn needs:
+
+```{r}
+cpacific.dat <- phyDat(cpacific, type = "USER", levels = c("0", "1"))
+# check this worked:
+# does this match what we have in our nexus file? 20 taxa, 1359 characters?
+cpacific.dat   
+```
+- [ ] Check that this worked -- does `cpacific.dat` match what we have in our nexus file? 20 taxa, 1359 characters?
+
+
+Now calculate distances (we'll use 'Hamming' distances here):
+
+```{r}
+d <- dist.hamming(cpacific.dat)
+print(d)
+```
+
+- [ ] What is the distance between Hawaiian and Fijian?
+
+Finally, make the tree: 
+
+```{r}
+tree.nj <- nj(d)
+plot(tree.nj, main = "Neighbour Joining Tree", font=1, lwd=2, edge.color="mediumvioletred")
+```
+
+The neighbour-joining tree will be unrooted to start with (i.e. we don't know where to put the root). We can root it in FijianBau to match what we know about the history:
+
+```{r}
+is.rooted(tree.nj)  # nope
+tree.nj <- root(tree.nj, "FijianBau")
+```
+
+## Build a Tree using Maximum Parsimony
+
+We can also use phangorn to find the maximum parsimony tree. To do this we will use
+an algorithm called the 'Parsimony Ratchet', and then another algorithm called
+'acctran' to get the branch lengths in terms of changes:
+
+```{r}
+tree.mp <- pratchet(cpacific.dat)
+# the tree currently has no edge lengths so we can estimate these using the
+# `acctran` method
+tree.mp <- acctran(tree.mp, cpacific.dat)
+tree.mp <- di2multi(tree.mp)  # remove any edges that have zero length
+plot(tree.mp, font=1, lwd=2, edge.color='forestgreen', main="Maximum Parsimony")
+```
+
+Let's compare the parsimony scores of our data on the nj tree to the mp tree
+
+- [ ] which tree is more parsimonious? 
+
+```{r}
+parsimony(tree.nj, cpacific.dat)
+parsimony(tree.mp, cpacific.dat)
+```
+
+
+## Build a tree with Maximum Likelihood:
+
+We first need to construct a `pml` object, and then run an optimisation. The model here will be the `Equal Rates` model:
+
+```{r}
+fit <- pml(tree.nj, data = cpacific.dat, model="ER")
+tree.ml <- optim.pml(fit, optNni=TRUE, ASC=TRUE, optBf=TRUE, optEdge=TRUE)
+plot(tree.ml, font=1, lwd=2, edge.color='darkorange', main="Maximum Parsimony")
+```
+
+Let's also fit a model with gamma-distributed rate heterogeneity:
+
+```{r}
+fit.gamma <- pml(tree.nj, data = cpacific.dat, k = 4, model='ER')
+tree.mlg <- optim.pml(fit.gamma, optNni=TRUE, ASC=TRUE, optBf=TRUE, optEdge=TRUE)
+plot(tree.mlg, font=1, lwd=2, edge.color='darkorange', main="Maximum Parsimony")
+```
+
+Now we can compare these:
+
+```{r}
+logLik(tree.ml)
+logLik(tree.mlg)
+```
+
+- [ ] Which model fits the data best? 
+
+We can formally test this with a likelihood ratio test:
+
+```{r}
+anova(tree.ml, tree.mlg)
+```
+
+Or if you prefer [Akaike's Information Criterion](https://en.wikipedia.org/wiki/Akaike_information_criterion):
+
+```{r}
+AIC(tree.ml, tree.mlg)
+```
+
+- [ ] Is this a significant difference in model fit according to LRT? 
+
+- [ ] Is this a significant difference in model fit according to AIC? 
+
+# Comparing our trees:
+
+Let's compare the four trees we've constructed. Note that I’m using the ‘ladderize’ function which rotates all the branches to place the smallest group on the top as it makes visually comparing the trees easier.
+
+- [ ] Can you see any major differences?
+
+```{r}
+plot(ladderize(tree.nj), font=1, lwd=2, edge.color='mediumvioletred', main="Neighbour Joining")
+```
+
+```{r}
+plot(ladderize(tree.mp), font=1, lwd=2, edge.color='forestgreen', main="Maximum Parsimony")
+```
+
+```{r}
+# Note the ml analysis gives us a different object, we need to extract the tree from this
+plot(ladderize(tree.mlg$tree), font=1, lwd=2, edge.color='darkorange', main="Maximum Likelihood (ER + Gamma)")
+```
+
+```{r}
+plot(ladderize(tree.mcct), font=1, lwd=2, edge.color='dodgerblue', main="Bayesian (Covarion + Relaxed Clock)")
+```
+
+# Plotting the tree on a map:
+
+Just for fun we can plot the tree on a map since we know where these languages are
+located:
+
+```{r}
+# load location data:
+locations <- read.csv('data/locations.csv')
+# we need to deal with the anti-meridian for these locations:
+locations$Longitude[locations$Longitude < 0] <- locations$Longitude[locations$Longitude < 0] + 360
+
+# make sure the order of the locations matches the order of the taxa in the tree
+# (so the right location matches the right language)
+rownames(locations) <- locations$Language
+coords <- locations[tree.mcct$tip.label, c('Latitude', "Longitude")]
+
+phylo.to.map(tree.mcct, coords)
+```
+

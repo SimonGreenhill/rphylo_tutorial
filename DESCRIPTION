@@ -8,4 +8,4 @@ Description: R Language Phylogenies Tutorial
 License: CC-BY
 Encoding: UTF-8
 LazyData: true
-Depends: ape, phytools, phangorn, ggplot2
+Depends: ape, phytools, phangorn, ggplot2, treeio
