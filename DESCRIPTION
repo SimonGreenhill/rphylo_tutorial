@@ -1,0 +1,10 @@
+Type: Compendium
+Package: rphylo_tutorial
+Title: A tutorial of how to use R to explore a language phylogeny
+Version: 0.0.1
+Authors@R: 
+    person("Simon", "Greenhill", , "simon@simon.net.nz", role = c("aut", "cre"))
+Description: R Language Phylogenies Tutorial
+License: CC-BY
+Encoding: UTF-8
+LazyData: true
