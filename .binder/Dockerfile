@@ -5,6 +5,6 @@ USER ${NB_USER}
 
 
 
-RUN wget https://github.com/SimonGreenhill/rphylo_tutorial/raw/main/DESCRIPTION && R -e "options(repos = list(CRAN = 'http://mran.revolutionanalytics.com/snapshot/2025-07-14/')); devtools::install_deps()"
-
+RUN wget https://github.com/SimonGreenhill/rphylo_tutorial/raw/main/DESCRIPTION && R -e "options(repos = list(CRAN = 'https://packagemanager.rstudio.com/cran/')); devtools::install_deps()"
+RUN if [ -f ../install.R ]; then R --quiet -f ../install.R; fi
 RUN rm DESCRIPTION.1; exit 0
